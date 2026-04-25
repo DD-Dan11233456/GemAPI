@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gemini Chat</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0f0e;
+    --surface: #141714;
+    --border: #252925;
+    --gem-blue: #4285f4;
+    --gem-red: #ea4335;
+    --gem-yellow: #fbbc05;
+    --gem-green: #34a853;
+    --accent: #8ab4f8;
+    --text: #e8ede9;
+    --muted: #6b7a6c;
+    --user-bg: #1a2a1c;
+    --ai-bg: #141a14;
+  }
+
+  body {
+    font-family: 'DM Mono', monospace;
+    background: var(--bg);
+    color: var(--text);
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── Grain overlay ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.35;
+  }
+
+  /* ── SCREENS ── */
+  .screen { display: none; flex-direction: column; height: 100dvh; }
+  .screen.active { display: flex; }
+
+  /* ── KEY SCREEN ── */
+  #key-screen {
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    gap: 2rem;
+    animation: fadeIn 0.6s ease forwards;
+  }
+
+  .logo-mark {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .gem-dots {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    width: 28px;
+    height: 28px;
+  }
+
+  .gem-dots span {
+    border-radius: 50%;
+    display: block;
+  }
+  .gem-dots span:nth-child(1) { background: var(--gem-blue); }
+  .gem-dots span:nth-child(2) { background: var(--gem-red); }
+  .gem-dots span:nth-child(3) { background: var(--gem-yellow); }
+  .gem-dots span:nth-child(4) { background: var(--gem-green); }
+
+  .logo-text {
+    font-family: 'Instrument Serif', serif;
+    font-size: 1.6rem;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+
+  .key-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2.5rem;
+    width: 100%;
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+  }
+
+  .key-card h2 {
+    font-family: 'Instrument Serif', serif;
+    font-size: 1.3rem;
+    font-weight: 400;
+    font-style: italic;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+
+  .input-wrap {
+    position: relative;
+  }
+
+  .input-wrap input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.85rem 2.8rem 0.85rem 1rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s;
+    letter-spacing: 0.03em;
+  }
+
+  .input-wrap input:focus { border-color: var(--accent); }
+  .input-wrap input::placeholder { color: var(--muted); }
+
+  .toggle-vis {
+    position: absolute;
+    right: 0.85rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-family: 'DM Mono', monospace;
+    padding: 0;
+    transition: color 0.2s;
+  }
+  .toggle-vis:hover { color: var(--accent); }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #060a06;
+    border: none;
+    border-radius: 10px;
+    padding: 0.9rem 1.5rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    transition: opacity 0.2s, transform 0.15s;
+  }
+  .btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
+  .btn-primary:active { transform: translateY(0); }
+
+  .hint {
+    font-size: 0.72rem;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .hint a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .hint a:hover { text-decoration: underline; }
+
+  #key-error {
+    font-size: 0.75rem;
+    color: #f28b82;
+    display: none;
+    padding: 0.6rem 0.8rem;
+    background: rgba(234,67,53,0.08);
+    border-radius: 8px;
+    border: 1px solid rgba(234,67,53,0.2);
+  }
+
+  /* ── CHAT SCREEN ── */
+  #chat-screen { animation: fadeIn 0.4s ease; }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  header .left {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+  }
+
+  .model-badge {
+    font-size: 0.68rem;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.2rem 0.5rem;
+    letter-spacing: 0.05em;
+  }
+
+  .btn-icon {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 0.4rem 0.7rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.04em;
+    transition: all 0.2s;
+  }
+  .btn-icon:hover { color: var(--text); border-color: var(--muted); }
+
+  /* ── Messages ── */
+  #messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+    scroll-behavior: smooth;
+  }
+
+  #messages::-webkit-scrollbar { width: 4px; }
+  #messages::-webkit-scrollbar-track { background: transparent; }
+  #messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .msg {
+    display: flex;
+    gap: 0.9rem;
+    animation: msgIn 0.3s ease forwards;
+    max-width: 800px;
+  }
+
+  .msg.user { flex-direction: row-reverse; align-self: flex-end; }
+  .msg.ai { align-self: flex-start; }
+
+  .avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    font-weight: 500;
+    margin-top: 2px;
+  }
+
+  .msg.user .avatar {
+    background: var(--user-bg);
+    border: 1px solid #2a3d2c;
+    color: var(--accent);
+  }
+
+  .msg.ai .avatar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+  }
+
+  .ai-avatar-dots {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px;
+    width: 14px;
+    height: 14px;
+  }
+  .ai-avatar-dots span { border-radius: 50%; display: block; }
+  .ai-avatar-dots span:nth-child(1) { background: var(--gem-blue); }
+  .ai-avatar-dots span:nth-child(2) { background: var(--gem-red); }
+  .ai-avatar-dots span:nth-child(3) { background: var(--gem-yellow); }
+  .ai-avatar-dots span:nth-child(4) { background: var(--gem-green); }
+
+  .bubble {
+    padding: 0.85rem 1.1rem;
+    border-radius: 14px;
+    font-size: 0.83rem;
+    line-height: 1.7;
+    max-width: 600px;
+    word-break: break-word;
+  }
+
+  .msg.user .bubble {
+    background: var(--user-bg);
+    border: 1px solid #2a3d2c;
+    border-top-right-radius: 4px;
+  }
+
+  .msg.ai .bubble {
+    background: var(--ai-bg);
+    border: 1px solid var(--border);
+    border-top-left-radius: 4px;
+    color: #ccd5cd;
+  }
+
+  /* markdown-ish rendering */
+  .bubble strong { color: var(--text); font-weight: 500; }
+  .bubble code {
+    background: #1e261e;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.1em 0.35em;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.85em;
+    color: #a8d5a2;
+  }
+  .bubble pre {
+    background: #0a0f0a;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem;
+    overflow-x: auto;
+    margin: 0.6rem 0;
+  }
+  .bubble pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 0.8rem;
+    color: #a8d5a2;
+  }
+
+  /* ── Typing indicator ── */
+  .typing-dots {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    padding: 0.3rem 0;
+  }
+  .typing-dots span {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--muted);
+    animation: bounce 1.2s ease-in-out infinite;
+  }
+  .typing-dots span:nth-child(2) { animation-delay: 0.15s; }
+  .typing-dots span:nth-child(3) { animation-delay: 0.3s; }
+
+  /* ── Input bar ── */
+  #input-bar {
+    border-top: 1px solid var(--border);
+    padding: 1rem 1.5rem;
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-end;
+    flex-shrink: 0;
+  }
+
+  #user-input {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.85rem 1rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.82rem;
+    color: var(--text);
+    outline: none;
+    resize: none;
+    min-height: 48px;
+    max-height: 200px;
+    line-height: 1.5;
+    transition: border-color 0.2s;
+  }
+  #user-input:focus { border-color: var(--accent); }
+  #user-input::placeholder { color: var(--muted); }
+
+  #send-btn {
+    background: var(--accent);
+    border: none;
+    border-radius: 10px;
+    width: 44px;
+    height: 44px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: opacity 0.2s, transform 0.15s;
+    color: #060a06;
+  }
+  #send-btn:hover { opacity: 0.85; transform: translateY(-1px); }
+  #send-btn:active { transform: translateY(0); }
+  #send-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+
+  /* ── Empty state ── */
+  #empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.8rem;
+    flex: 1;
+    color: var(--muted);
+    text-align: center;
+    padding: 2rem;
+  }
+  #empty-state .big-gem { transform: scale(1.8); margin-bottom: 0.5rem; }
+  #empty-state h3 {
+    font-family: 'Instrument Serif', serif;
+    font-size: 1.3rem;
+    font-weight: 400;
+    font-style: italic;
+    color: var(--text);
+  }
+  #empty-state p { font-size: 0.75rem; line-height: 1.6; max-width: 300px; }
+
+  /* ── Animations ── */
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @keyframes msgIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @keyframes bounce {
+    0%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-5px); }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── KEY SCREEN ── -->
+<div id="key-screen" class="screen active">
+  <div class="logo-mark">
+    <div class="gem-dots">
+      <span></span><span></span><span></span><span></span>
+    </div>
+    <span class="logo-text">Gemini</span>
+  </div>
+
+  <div class="key-card">
+    <h2>Enter your API key to begin a conversation.</h2>
+
+    <div class="input-wrap">
+      <input type="password" id="api-key-input" placeholder="AIza..." autocomplete="off" spellcheck="false" />
+      <button class="toggle-vis" id="toggle-vis" title="Toggle visibility">show</button>
+    </div>
+
+    <div id="key-error">Invalid or missing API key. Please check and try again.</div>
+
+    <button class="btn-primary" id="start-btn">Connect →</button>
+
+    <p class="hint">
+      Your key is stored only in memory and never sent anywhere except Google's API.<br><br>
+      Don't have a key? Get one free at <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com</a>.
+    </p>
+  </div>
+</div>
+
+<!-- ── CHAT SCREEN ── -->
+<div id="chat-screen" class="screen">
+  <header>
+    <div class="left">
+      <div class="gem-dots" style="width:20px;height:20px;gap:3px;">
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <span class="logo-text" style="font-size:1.1rem;">Gemini</span>
+      <span class="model-badge">gemini-2.0-flash</span>
+    </div>
+    <button class="btn-icon" id="change-key-btn">change key</button>
+  </header>
+
+  <div id="messages">
+    <div id="empty-state">
+      <div class="gem-dots big-gem" style="width:32px;height:32px;gap:5px;">
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <h3>What's on your mind?</h3>
+      <p>Start a conversation with Gemini. Ask anything — code, ideas, analysis, or just a chat.</p>
+    </div>
+  </div>
+
+  <div id="input-bar">
+    <textarea id="user-input" placeholder="Message Gemini…" rows="1"></textarea>
+    <button id="send-btn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="22" y1="2" x2="11" y2="13"></line>
+        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<script>
+  let apiKey = '';
+  const history = [];
+
+  // ── Elements ──
+  const keyScreen    = document.getElementById('key-screen');
+  const chatScreen   = document.getElementById('chat-screen');
+  const apiInput     = document.getElementById('api-key-input');
+  const toggleVis    = document.getElementById('toggle-vis');
+  const startBtn     = document.getElementById('start-btn');
+  const keyError     = document.getElementById('key-error');
+  const messagesEl   = document.getElementById('messages');
+  const emptyState   = document.getElementById('empty-state');
+  const userInput    = document.getElementById('user-input');
+  const sendBtn      = document.getElementById('send-btn');
+  const changeKeyBtn = document.getElementById('change-key-btn');
+
+  // ── Toggle password visibility ──
+  toggleVis.addEventListener('click', () => {
+    const isPass = apiInput.type === 'password';
+    apiInput.type = isPass ? 'text' : 'password';
+    toggleVis.textContent = isPass ? 'hide' : 'show';
+  });
+
+  // ── Start / key validation ──
+  startBtn.addEventListener('click', async () => {
+    const key = apiInput.value.trim();
+    if (!key) { showKeyError('Please enter an API key.'); return; }
+
+    startBtn.textContent = 'Connecting…';
+    startBtn.disabled = true;
+    keyError.style.display = 'none';
+
+    // Quick validation ping
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts: [{ text: 'hi' }] }] })
+        }
+      );
+      if (!res.ok) throw new Error('bad key');
+      apiKey = key;
+      switchToChat();
+    } catch {
+      showKeyError('Invalid or missing API key. Please check and try again.');
+      startBtn.textContent = 'Connect →';
+      startBtn.disabled = false;
+    }
+  });
+
+  apiInput.addEventListener('keydown', e => { if (e.key === 'Enter') startBtn.click(); });
+
+  function showKeyError(msg) {
+    keyError.textContent = msg;
+    keyError.style.display = 'block';
+  }
+
+  function switchToChat() {
+    keyScreen.classList.remove('active');
+    chatScreen.classList.add('active');
+    userInput.focus();
+  }
+
+  // ── Change key ──
+  changeKeyBtn.addEventListener('click', () => {
+    chatScreen.classList.remove('active');
+    keyScreen.classList.add('active');
+    apiInput.value = '';
+    startBtn.textContent = 'Connect →';
+    startBtn.disabled = false;
+    keyError.style.display = 'none';
+  });
+
+  // ── Auto-resize textarea ──
+  userInput.addEventListener('input', () => {
+    userInput.style.height = 'auto';
+    userInput.style.height = Math.min(userInput.scrollHeight, 200) + 'px';
+  });
+
+  userInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  sendBtn.addEventListener('click', sendMessage);
+
+  // ── Send message ──
+  async function sendMessage() {
+    const text = userInput.value.trim();
+    if (!text || sendBtn.disabled) return;
+
+    if (emptyState) emptyState.remove();
+
+    appendMsg('user', text);
+    history.push({ role: 'user', parts: [{ text }] });
+
+    userInput.value = '';
+    userInput.style.height = 'auto';
+    sendBtn.disabled = true;
+
+    const typingEl = appendTyping();
+
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: history })
+        }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        const errMsg = data?.error?.message || 'An error occurred.';
+        throw new Error(errMsg);
+      }
+
+      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || '(empty response)';
+      history.push({ role: 'model', parts: [{ text: reply }] });
+
+      typingEl.remove();
+      appendMsg('ai', reply);
+    } catch (err) {
+      typingEl.remove();
+      appendMsg('ai', `⚠ ${err.message}`);
+    }
+
+    sendBtn.disabled = false;
+    userInput.focus();
+  }
+
+  // ── DOM helpers ──
+  function appendMsg(role, text) {
+    const msg = document.createElement('div');
+    msg.className = `msg ${role}`;
+
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar';
+
+    if (role === 'ai') {
+      avatar.innerHTML = `<div class="ai-avatar-dots"><span></span><span></span><span></span><span></span></div>`;
+    } else {
+      avatar.textContent = 'you';
+    }
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.innerHTML = renderMarkdown(text);
+
+    msg.appendChild(avatar);
+    msg.appendChild(bubble);
+    messagesEl.appendChild(msg);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return msg;
+  }
+
+  function appendTyping() {
+    const msg = document.createElement('div');
+    msg.className = 'msg ai';
+    msg.innerHTML = `
+      <div class="avatar"><div class="ai-avatar-dots"><span></span><span></span><span></span><span></span></div></div>
+      <div class="bubble"><div class="typing-dots"><span></span><span></span><span></span></div></div>
+    `;
+    messagesEl.appendChild(msg);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return msg;
+  }
+
+  // ── Basic markdown renderer ──
+  function renderMarkdown(text) {
+    return text
+      // code blocks
+      .replace(/```(\w+)?\n([\s\S]*?)```/g, (_, lang, code) =>
+        `<pre><code>${escHtml(code.trim())}</code></pre>`)
+      // inline code
+      .replace(/`([^`]+)`/g, (_, c) => `<code>${escHtml(c)}</code>`)
+      // bold
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      // italic
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      // newlines
+      .replace(/\n/g, '<br>');
+  }
+
+  function escHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+</script>
+</body>
+</html>
