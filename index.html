@@ -468,7 +468,7 @@
         <span></span><span></span><span></span><span></span>
       </div>
       <span class="logo-text" style="font-size:1.1rem;">Gemini</span>
-      <span class="model-badge">gemini-2.0-flash</span>
+      <span class="model-badge">gemini-1.5-flash</span>
     </div>
     <button class="btn-icon" id="change-key-btn">change key</button>
   </header>
@@ -583,7 +583,7 @@
 
     try {
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
