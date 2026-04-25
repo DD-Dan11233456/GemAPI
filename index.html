@@ -519,32 +519,12 @@
   });
 
   // ── Start / key validation ──
-  startBtn.addEventListener('click', async () => {
+  startBtn.addEventListener('click', () => {
     const key = apiInput.value.trim();
     if (!key) { showKeyError('Please enter an API key.'); return; }
-
-    startBtn.textContent = 'Connecting…';
-    startBtn.disabled = true;
     keyError.style.display = 'none';
-
-    // Quick validation ping
-    try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: 'hi' }] }] })
-        }
-      );
-      if (!res.ok) throw new Error('bad key');
-      apiKey = key;
-      switchToChat();
-    } catch {
-      showKeyError('Invalid or missing API key. Please check and try again.');
-      startBtn.textContent = 'Connect →';
-      startBtn.disabled = false;
-    }
+    apiKey = key;
+    switchToChat();
   });
 
   apiInput.addEventListener('keydown', e => { if (e.key === 'Enter') startBtn.click(); });
